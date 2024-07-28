@@ -1,32 +1,65 @@
+import sys
+import os
+import logging
 import pymysql
-from PyQt5.QtWidgets import QApplication, QWidget, QVBoxLayout, QHBoxLayout, QLineEdit, QPushButton, QLabel, QSpacerItem, QSizePolicy, QMessageBox, QFileDialog
+from PyQt5.QtWidgets import QApplication, QWidget, QVBoxLayout, QHBoxLayout, QLineEdit, QPushButton, QLabel, QSpacerItem, QSizePolicy, QMessageBox, QFileDialog, QStackedWidget
 from PyQt5.QtGui import QFont, QColor
 from PyQt5.QtCore import Qt
 from PyQt5.QtWidgets import QGraphicsDropShadowEffect
 import sqlalchemy as sal
 import pandas as pd
 
+# Setup logging
+logging.basicConfig(filename='app.log', level=logging.ERROR, format='%(asctime)s %(levelname)s %(message)s')
+
 class DatabaseApp(QWidget):
     def __init__(self):
         """
         Constructor method that initializes the DatabaseApp class.
         """
-        super().__init__()  # Initialize the parent class
-        self.initUI()  # Initialize the UI components
-        self.conn = None  # Initialize connection variable to None
+        print("Initializing DatabaseApp")
+        super().__init__()
+        print("Calling initUI")
+        self.initUI()
+        print("initUI completed")
+        self.conn = None
+        self.table_name = None
 
     def initUI(self):
         """
         Method to initialize the user interface.
         """
-        # Set the title and size of the main window
+        print("Setting up UI components")
         self.setWindowTitle('Database Interaction App 📊')
-        self.setGeometry(100, 100, 600, 700)
-
-        # Set the overall background color
+        self.setGeometry(100, 100, 600, 750)
         self.setStyleSheet("background-color: #e0f7fa;")
 
-        # Create QLineEdit widgets for database connection setup with placeholders
+        # Create a QStackedWidget to hold multiple pages
+        self.stacked_widget = QStackedWidget(self)
+
+        # Create the first page
+        self.page1 = QWidget()
+        self.page2 = QWidget()
+        self.create_page1()
+        self.create_page2()
+
+        self.stacked_widget.addWidget(self.page1)
+        self.stacked_widget.addWidget(self.page2)
+
+        # Set the first page as the initial page
+        self.stacked_widget.setCurrentIndex(0)
+
+        # Set the layout
+        layout = QVBoxLayout(self)
+        layout.addWidget(self.stacked_widget)
+        self.setLayout(layout)
+        print("UI setup completed")
+        self.show()  # Explicitly show the window
+
+    def create_page1(self):
+        """
+        Create the first page for database connection.
+        """
         self.dialect_edit = self.create_input_field('Enter SQL Dialect (e.g., mysql)')
         self.driver_edit = self.create_input_field('Enter SQL Driver (e.g., pymysql)')
         self.username_edit = self.create_input_field('Enter Username')
@@ -34,8 +67,8 @@ class DatabaseApp(QWidget):
         self.host_edit = self.create_input_field('Enter Host Address (e.g., localhost)')
         self.port_edit = self.create_input_field('Enter Port Number (e.g., 3306)')
         self.database_edit = self.create_input_field('Enter Database Name')
+        self.table_edit = self.create_input_field('Enter Table Name (optional)')
 
-        # Style the buttons and add shadow effect
         button_style = """
             QPushButton {
                 background-color: #4CAF50;
@@ -61,39 +94,12 @@ class DatabaseApp(QWidget):
             }
         """
 
-        # Create and style QPushButton widgets
-        self.connect_button = QPushButton('Connect to Database')  # Button to connect to the database
-        self.connect_button.clicked.connect(self.connect_to_database)  # Connect button to its handler method
+        self.connect_button = QPushButton('Connect to Database')
+        self.connect_button.clicked.connect(self.connect_to_database)
         self.connect_button.setStyleSheet(button_style)
         self.add_shadow_effect(self.connect_button)
 
-        self.disconnect_button = QPushButton('Disconnect from Database')  # Button to disconnect from the database
-        self.disconnect_button.clicked.connect(self.disconnect_from_database)  # Connect button to its handler method
-        self.disconnect_button.setStyleSheet(button_style)
-        self.add_shadow_effect(self.disconnect_button)
-
-        self.import_button = QPushButton('Import Excel File')  # Button to import an Excel file
-        self.import_button.clicked.connect(self.import_excel)  # Connect button to its handler method
-        self.import_button.setStyleSheet(button_style)
-        self.add_shadow_effect(self.import_button)
-
-        self.lowercase_button = QPushButton('Lowercase Headers')  # Button to lowercase headers
-        self.lowercase_button.clicked.connect(self.lowercase_headers)  # Connect button to its handler method
-        self.lowercase_button.setStyleSheet(button_style)
-        self.add_shadow_effect(self.lowercase_button)
-
-        self.replace_spaces_button = QPushButton('Replace Spaces in Headers')  # Button to replace spaces in headers
-        self.replace_spaces_button.clicked.connect(self.replace_spaces_in_headers)  # Connect button to its handler method
-        self.replace_spaces_button.setStyleSheet(button_style)
-        self.add_shadow_effect(self.replace_spaces_button)
-
-        self.drop_na_button = QPushButton('Drop NA')  # Button to drop NA values
-        self.drop_na_button.clicked.connect(self.drop_na_values)  # Connect button to its handler method
-        self.drop_na_button.setStyleSheet(button_style)
-        self.add_shadow_effect(self.drop_na_button)
-
-        # Create and style QLabel widgets
-        app_title_label = QLabel('Database Interaction App 📊')  # Application title
+        app_title_label = QLabel('Database Connection 📊')
         app_title_label.setFont(QFont('Arial', 24, QFont.Bold))
         app_title_label.setStyleSheet("color: #00695c;")
         app_title_label.setAlignment(Qt.AlignCenter)
@@ -101,42 +107,24 @@ class DatabaseApp(QWidget):
         section_font = QFont('Verdana', 16, QFont.Bold)
         section_style = "color: #004d40;"
 
-        db_connection_label = QLabel('Database Connection 🛠️')  # Label for database connection section
+        db_connection_label = QLabel('Database Connection 🛠️')
         db_connection_label.setFont(section_font)
         db_connection_label.setStyleSheet(section_style)
 
-        import_data_label = QLabel('Import Data 📥')  # Label for import data section
-        import_data_label.setFont(section_font)
-        import_data_label.setStyleSheet(section_style)
-
-        data_preparation_label = QLabel('Data Preparation 📝')  # Label for data preparation section
-        data_preparation_label.setFont(section_font)
-        data_preparation_label.setStyleSheet(section_style)
-
-        data_cleaning_label = QLabel('Data Cleaning 🧹')  # Label for data cleaning section
-        data_cleaning_label.setFont(section_font)
-        data_cleaning_label.setStyleSheet(section_style)
-
-        # Create and style the status label
-        self.status_label = QLabel('Status: Ready')  # Label to display the current status
+        self.status_label = QLabel('Status: Ready')
         self.status_label.setFont(QFont('Arial', 16, QFont.Bold))
         self.status_label.setStyleSheet("color: #004d40;")
         self.status_label.setAlignment(Qt.AlignCenter)
 
-        # Layout setup
-        main_layout = QVBoxLayout()  # Main vertical layout
+        main_layout = QVBoxLayout()
         main_layout.setAlignment(Qt.AlignTop)
 
-        # Add the application title label to the main layout
         main_layout.addWidget(app_title_label)
-
-        # Add spacing between the application title and the main content
         main_layout.addSpacing(20)
 
-        form_layout = QVBoxLayout()  # Form vertical layout
+        form_layout = QVBoxLayout()
         form_layout.setSpacing(10)
 
-        # Add widgets to the form layout
         form_layout.addWidget(db_connection_label)
         form_layout.addWidget(self.dialect_edit)
         form_layout.addWidget(self.driver_edit)
@@ -145,39 +133,133 @@ class DatabaseApp(QWidget):
         form_layout.addWidget(self.host_edit)
         form_layout.addWidget(self.port_edit)
         form_layout.addWidget(self.database_edit)
+        form_layout.addWidget(self.table_edit)
         form_layout.addWidget(self.connect_button)
-        form_layout.addWidget(self.disconnect_button)
+        form_layout.addWidget(self.status_label)
 
-        # Add spacing between sections
-        form_layout.addSpacing(10)
+        center_layout = QHBoxLayout()
+        center_layout.addItem(QSpacerItem(0, 0, QSizePolicy.Expanding, QSizePolicy.Minimum))
+        center_layout.addLayout(form_layout)
+        center_layout.addItem(QSpacerItem(0, 0, QSizePolicy.Expanding, QSizePolicy.Minimum))
 
-        form_layout.addWidget(import_data_label)
+        main_layout.addLayout(center_layout)
+
+        self.page1.setLayout(main_layout)
+
+    def create_page2(self):
+        """
+        Create the second page for other database interactions.
+        """
+        button_style = """
+            QPushButton {
+                background-color: #4CAF50;
+                border: none;
+                color: white;
+                padding: 10px 20px;
+                text-align: center;
+                text-decoration: none;
+                display: inline-block;
+                font-size: 16px;
+                margin: 4px 2px;
+                transition-duration: 0.4s;
+                cursor: pointer;
+                border-radius: 12px;
+                font-family: Verdana;
+                min-width: 10px;
+                min-height: 20px;
+            }
+            QPushButton:hover {
+                background-color: white;
+                color: black;
+                border: 2px solid #4CAF50;
+            }
+        """
+
+        self.import_button = QPushButton('Import Excel File')
+        self.import_button.clicked.connect(self.import_excel)
+        self.import_button.setStyleSheet(button_style)
+        self.add_shadow_effect(self.import_button)
+
+        self.lowercase_button = QPushButton('Lowercase Headers')
+        self.lowercase_button.clicked.connect(self.lowercase_headers)
+        self.lowercase_button.setStyleSheet(button_style)
+        self.add_shadow_effect(self.lowercase_button)
+
+        self.replace_spaces_button = QPushButton('Replace Spaces in Headers')
+        self.replace_spaces_button.clicked.connect(self.replace_spaces_in_headers)
+        self.replace_spaces_button.setStyleSheet(button_style)
+        self.add_shadow_effect(self.replace_spaces_button)
+
+        self.drop_na_button = QPushButton('Drop NA')
+        self.drop_na_button.clicked.connect(self.drop_na_values)
+        self.drop_na_button.setStyleSheet(button_style)
+        self.add_shadow_effect(self.drop_na_button)
+
+        self.remove_duplicates_button = QPushButton('Remove Duplicates')
+        self.remove_duplicates_button.clicked.connect(self.remove_duplicates)
+        self.remove_duplicates_button.setStyleSheet(button_style)
+        self.add_shadow_effect(self.remove_duplicates_button)
+
+        self.disconnect_button = QPushButton('Disconnect from Database')
+        self.disconnect_button.clicked.connect(self.disconnect_from_database)
+        self.disconnect_button.setStyleSheet(button_style)
+        self.add_shadow_effect(self.disconnect_button)
+
+        section_font = QFont('Verdana', 16, QFont.Bold)
+        section_style = "color: #004d40;"
+
+        import_data_label = QLabel('Import Data 📥')
+        import_data_label.setFont(section_font)
+        import_data_label.setStyleSheet(section_style)
+
+        data_preparation_label = QLabel('Data Preparation 📝')
+        data_preparation_label.setFont(section_font)
+        data_preparation_label.setStyleSheet(section_style)
+
+        data_cleaning_label = QLabel('Data Cleaning 🧹')
+        data_cleaning_label.setFont(section_font)
+        data_cleaning_label.setStyleSheet(section_style)
+
+        self.status_label = QLabel('Status: Ready')
+        self.status_label.setFont(QFont('Arial', 16, QFont.Bold))
+        self.status_label.setStyleSheet("color: #004d40;")
+        self.status_label.setAlignment(Qt.AlignCenter)
+
+        main_layout = QVBoxLayout()
+        main_layout.setAlignment(Qt.AlignTop)
+
+        form_layout = QVBoxLayout()
+        form_layout.setSpacing(10)
+
+        form_layout.addWidget(import_data_label
+
+)
         form_layout.addWidget(self.import_button)
 
-        # Add spacing between sections
         form_layout.addSpacing(10)
 
         form_layout.addWidget(data_preparation_label)
         form_layout.addWidget(self.lowercase_button)
         form_layout.addWidget(self.replace_spaces_button)
 
-        # Add spacing between sections
         form_layout.addSpacing(10)
 
         form_layout.addWidget(data_cleaning_label)
         form_layout.addWidget(self.drop_na_button)
+        form_layout.addWidget(self.remove_duplicates_button)
+
+        form_layout.addWidget(self.disconnect_button)
+
         form_layout.addWidget(self.status_label)
 
-        # Center the form layout
-        center_layout = QHBoxLayout()  # Horizontal layout to center the form
+        center_layout = QHBoxLayout()
         center_layout.addItem(QSpacerItem(0, 0, QSizePolicy.Expanding, QSizePolicy.Minimum))
         center_layout.addLayout(form_layout)
         center_layout.addItem(QSpacerItem(0, 0, QSizePolicy.Expanding, QSizePolicy.Minimum))
 
-        main_layout.addLayout(center_layout)  # Add the centered layout to the main layout
+        main_layout.addLayout(center_layout)
 
-        self.setLayout(main_layout)  # Set the main layout
-        self.show()  # Show the main window
+        self.page2.setLayout(main_layout)
 
     def create_input_field(self, placeholder_text, password=False):
         """
@@ -186,10 +268,9 @@ class DatabaseApp(QWidget):
         input_field = QLineEdit()
         input_field.setPlaceholderText(placeholder_text)
         input_field.setFont(QFont('Arial', 14))
-        if (password):
+        if password:
             input_field.setEchoMode(QLineEdit.Password)
 
-        # Style the input field
         input_field.setStyleSheet("""
             QLineEdit {
                 border: 1px solid #4CAF50;
@@ -203,7 +284,6 @@ class DatabaseApp(QWidget):
             }
         """)
 
-        # Add shadow effect to the input field
         shadow = QGraphicsDropShadowEffect()
         shadow.setBlurRadius(10)
         shadow.setColor(QColor(0, 0, 0, 160))
@@ -237,103 +317,152 @@ class DatabaseApp(QWidget):
             engine = sal.create_engine(connection_url)
             self.conn = engine.connect()
             self.status_label.setText('Status: Connected to Database')
-            self.show_message_box('Connection Successful', 'Connected to the database successfully.', QMessageBox.Information)
+
+            # Handle table connection
+            self.table_name = self.table_edit.text().strip()
+            if self.table_name:
+                try:
+                    pd.read_sql_table(self.table_name, self.conn)
+                    self.status_label.setText(f'Status: Connected to Table "{self.table_name}"')
+                    self.show_message_box('Connection Successful', f'Connected to the table "{self.table_name}" successfully.', QMessageBox.Information)
+                except Exception as e:
+                    self.table_name = None
+                    self.show_message_box('Table Connection Error', f'Table "{self.table_name}" does not exist. Error: {e}', QMessageBox.Critical)
+            else:
+                self.show_message_box('Connection Successful', 'Connected to the database successfully. You can create a new table by importing an Excel file.', QMessageBox.Information)
+
+            self.stacked_widget.setCurrentIndex(1)
         except Exception as e:
             self.conn = None
             self.status_label.setText('Status: Connection Failed')
+            logging.error(f'Error connecting to database: {e}')
             self.show_message_box('Connection Error', f'Error connecting to database: {e}', QMessageBox.Critical)
 
     def disconnect_from_database(self):
         """
-        Disconnect from the currently connected database.
+        Disconnect from the database.
         """
         if self.conn:
             try:
                 self.conn.close()
                 self.conn = None
+                self.table_name = None
                 self.status_label.setText('Status: Disconnected from Database')
                 self.show_message_box('Disconnection Successful', 'Disconnected from the database successfully.', QMessageBox.Information)
+                # Switch back to the first page after disconnection
+                self.stacked_widget.setCurrentIndex(0)
             except Exception as e:
+                logging.error(f'Error disconnecting from database: {e}')
                 self.show_message_box('Disconnection Error', f'Error disconnecting from database: {e}', QMessageBox.Critical)
         else:
-            self.show_message_box('Disconnection Error', 'No active database connection to disconnect.', QMessageBox.Warning)
+            self.show_message_box('Disconnection Error', 'No database connection to disconnect.', QMessageBox.Warning)
 
     def import_excel(self):
         """
         Import data from an Excel file into the database.
         """
         if not self.conn:
-            self.show_message_box('Connection Error', 'Database connection not established.', QMessageBox.Warning)
+            self.show_message_box('Import Error', 'No database connection established.', QMessageBox.Warning)
             return
 
-        file_path, _ = QFileDialog.getOpenFileName(self, 'Open Excel File', '', 'Excel Files (*.xls *.xlsx)')
-        if file_path:
-            try:
-                df = pd.read_excel(file_path)
-                df.to_sql(name='orders', con=self.conn, if_exists='replace', index=False)
-                self.show_message_box('Import Successful', f'Successfully imported data from {file_path} into table orders.', QMessageBox.Information)
-            except Exception as e:
-                self.show_message_box('Import Error', f'Error importing Excel file: {e}', QMessageBox.Critical)
+        try:
+            file_path, _ = QFileDialog.getOpenFileName(self, 'Open Excel File', os.getenv('HOME'), 'Excel Files (*.xlsx *.xls)')
+            if not file_path:
+                return
+
+            df = pd.read_excel(file_path)
+            file_name = os.path.splitext(os.path.basename(file_path))[0]
+            self.table_name = file_name
+
+            df.to_sql(self.table_name, con=self.conn, if_exists='replace', index=False)
+            self.show_message_box('Import Successful', f'Excel file imported successfully as table "{self.table_name}".', QMessageBox.Information)
+        except Exception as e:
+            logging.error(f'Error importing Excel file: {e}')
+            self.show_message_box('Import Error', f'Error importing Excel file: {e}', QMessageBox.Critical)
 
     def lowercase_headers(self):
         """
-        Convert column headers of the 'orders' table to lowercase.
+        Lowercase the headers of a selected table in the database.
         """
-        if not self.conn:
-            self.show_message_box('Connection Error', 'Database connection not established.', QMessageBox.Warning)
-            return
-
         try:
-            df = pd.read_sql_table('orders', self.conn)
-            df.columns = df.columns.str.lower()
-            df.to_sql(name='orders', con=self.conn, if_exists='replace', index=False)
-            self.show_message_box('Lowercase Headers', 'Successfully converted column headers to lowercase.', QMessageBox.Information)
+            if not self.table_name:
+                self.show_message_box('Error', 'No table name provided.', QMessageBox.Warning)
+                return
+
+            df = pd.read_sql_table(self.table_name, self.conn)
+            df.columns = [col.lower() for col in df.columns]
+            df.to_sql(self.table_name, con=self.conn, if_exists='replace', index=False)
+            self.show_message_box('Lowercase Headers', 'Table headers lowercased successfully.', QMessageBox.Information)
         except Exception as e:
-            self.show_message_box('Lowercase Headers Error', f'Error converting column headers to lowercase: {e}', QMessageBox.Critical)
+            logging.error(f'Error lowercasing headers: {e}')
+            self.show_message_box('Lowercase Headers Error', f'Error lowercasing headers: {e}', QMessageBox.Critical)
 
     def replace_spaces_in_headers(self):
         """
-        Replace spaces in column headers of the 'orders' table with underscores.
+        Replace spaces in the headers of a selected table in the database with underscores.
         """
-        if not self.conn:
-            self.show_message_box('Connection Error', 'Database connection not established.', QMessageBox.Warning)
-            return
-
         try:
-            df = pd.read_sql_table('orders', self.conn)
-            df.columns = df.columns.str.replace(' ', '_')
-            df.to_sql(name='orders', con=self.conn, if_exists='replace', index=False)
-            self.show_message_box('Replace Spaces in Headers', 'Successfully replaced spaces with underscores in column headers.', QMessageBox.Information)
+            if not self.table_name:
+                self.show_message_box('Error', 'No table name provided.', QMessageBox.Warning)
+                return
+
+            df = pd.read_sql_table(self.table_name, self.conn)
+            df.columns = [col.replace(' ', '_') for col in df.columns]
+            df.to_sql(self.table_name, con=self.conn, if_exists='replace', index=False)
+            self.show_message_box('Replace Spaces in Headers', 'Spaces in headers replaced successfully.', QMessageBox.Information)
         except Exception as e:
-            self.show_message_box('Replace Spaces in Headers Error', f'Error replacing spaces in column headers: {e}', QMessageBox.Critical)
+            logging.error(f'Error replacing spaces in headers: {e}')
+            self.show_message_box('Replace Spaces in Headers Error', f'Error replacing spaces in headers: {e}', QMessageBox.Critical)
 
     def drop_na_values(self):
         """
-        Drop rows with 'NA' values from the 'orders' table.
+        Drop rows with NA values from a selected table in the database.
         """
-        if not self.conn:
-            self.show_message_box('Connection Error', 'Database connection not established.', QMessageBox.Warning)
-            return
-
         try:
-            df = pd.read_sql_table('orders', self.conn)
-            cleaned_df = df.replace('NA', pd.NA).dropna()
-            cleaned_df.to_sql(name='orders', con=self.conn, if_exists='replace', index=False)
-            self.show_message_box('Drop NA', 'Successfully dropped rows with "NA" values.', QMessageBox.Information)
+            if not self.table_name:
+                self.show_message_box('Error', 'No table name provided.', QMessageBox.Warning)
+                return
+
+            df = pd.read_sql_table(self.table_name, self.conn)
+            df = df.dropna()
+            df.to_sql(self.table_name, con=self.conn, if_exists='replace', index=False)
+            self.show_message_box('Drop NA Values', 'NA values dropped successfully.', QMessageBox.Information)
         except Exception as e:
-            self.show_message_box('Drop NA Error', f'Error dropping rows with "NA" values: {e}', QMessageBox.Critical)
+            logging.error(f'Error dropping NA values: {e}')
+            self.show_message_box('Drop NA Values Error', f'Error dropping NA values: {e}', QMessageBox.Critical)
+
+    def remove_duplicates(self):
+        """
+        Remove duplicate rows from a selected table in the database.
+        """
+        try:
+            if not self.table_name:
+                self.show_message_box('Error', 'No table name provided.', QMessageBox.Warning)
+                return
+
+            df = pd.read_sql_table(self.table_name, self.conn)
+            df = df.drop_duplicates()
+            df.to_sql(self.table_name, con=self.conn, if_exists='replace', index=False)
+            self.show_message_box('Remove Duplicates', 'Duplicate rows removed successfully.', QMessageBox.Information)
+        except Exception as e:
+            logging.error(f'Error removing duplicates: {e}')
+            self.show_message_box('Remove Duplicates Error', f'Error removing duplicates: {e}', QMessageBox.Critical)
 
     def show_message_box(self, title, message, icon):
         """
-        Show a message box with the specified title, message, and icon.
+        Show a message box with the given title, message, and icon.
         """
         msg_box = QMessageBox()
-        msg_box.setIcon(icon)
         msg_box.setWindowTitle(title)
         msg_box.setText(message)
+        msg_box.setIcon(icon)
         msg_box.exec_()
-        
-if __name__ == "__main__":
-    app = QApplication([])
-    ex = DatabaseApp()
-    app.exec_()
+
+if __name__ == '__main__':
+    print("Starting the application...")
+    app = QApplication(sys.argv)
+    window = DatabaseApp()
+    window.show()  # Explicitly show the window
+    window.raise_()  # Brings the window to the front
+    window.activateWindow()  # Activates the window
+    sys.exit(app.exec_())
