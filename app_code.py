@@ -3,28 +3,27 @@ import os  # Import the os module for interacting with the operating system
 import logging  # Import the logging module for logging errors and messages
 import pymysql  # Import pymysql for MySQL database connectivity
 from PyQt5.QtWidgets import (
-    QApplication, QWidget, QVBoxLayout, QHBoxLayout, QLineEdit, QPushButton, QLabel, 
-    QSpacerItem, QSizePolicy, QMessageBox, QFileDialog, QStackedWidget
+    QApplication, QWidget, QVBoxLayout, QHBoxLayout, QLineEdit, QPushButton, QLabel,
+    QSpacerItem, QSizePolicy, QMessageBox, QFileDialog, QStackedWidget, QDesktopWidget
 )  # Import necessary PyQt5 widgets
 from PyQt5.QtGui import QFont, QColor  # Import QFont for setting fonts and QColor for colors
 from PyQt5.QtCore import Qt  # Import Qt for alignment and other constants
 from PyQt5.QtWidgets import QGraphicsDropShadowEffect  # Import QGraphicsDropShadowEffect for shadow effects
 import sqlalchemy as sal  # Import SQLAlchemy for database interactions
 import pandas as pd  # Import pandas for data manipulation
+import qtawesome as qta  # Import QtAwesome for icons
 
 # Setup logging
 logging.basicConfig(filename='app.log', level=logging.ERROR, format='%(asctime)s %(levelname)s %(message)s')
+
 
 class DatabaseApp(QWidget):
     def __init__(self):
         """
         Constructor method that initializes the DatabaseApp class.
         """
-        print("Initializing DatabaseApp")
         super().__init__()
-        print("Calling initUI")
         self.initUI()
-        print("initUI completed")
         self.conn = None  # Initialize the database connection as None
         self.table_name = None  # Initialize the table name as None
 
@@ -32,9 +31,9 @@ class DatabaseApp(QWidget):
         """
         Method to initialize the user interface.
         """
-        print("Setting up UI components")
-        self.setWindowTitle('Database Interaction App 📊')  # Set the window title
-        self.setGeometry(100, 100, 600, 750)  # Set the window size and position
+        self.setWindowTitle('SQL Manager 📊')  # Set the window title
+        self.setGeometry(0, 0, 600, 750)  # Set the window size
+        self.center_window()  # Center the window
         self.setStyleSheet("background-color: #e0f7fa;")  # Set the background color
 
         # Create a QStackedWidget to hold multiple pages
@@ -57,27 +56,34 @@ class DatabaseApp(QWidget):
         layout = QVBoxLayout(self)
         layout.addWidget(self.stacked_widget)
         self.setLayout(layout)
-        print("UI setup completed")
         self.show()  # Explicitly show the window
 
-    def create_page1(self):
+    def center_window(self):
         """
-        Create the first page for database connection.
+        Center the application window on the screen.
         """
-        # Create input fields for database connection details
-        self.dialect_edit = self.create_input_field('Enter SQL Dialect (e.g., mysql)')
-        self.driver_edit = self.create_input_field('Enter SQL Driver (e.g., pymysql)')
-        self.username_edit = self.create_input_field('Enter Username')
-        self.password_edit = self.create_input_field('Enter Password', password=True)
-        self.host_edit = self.create_input_field('Enter Host Address (e.g., localhost)')
-        self.port_edit = self.create_input_field('Enter Port Number (e.g., 3306)')
-        self.database_edit = self.create_input_field('Enter Database Name')
-        self.table_edit = self.create_input_field('Enter Table Name (optional)')
+        qr = self.frameGeometry()
+        cp = QDesktopWidget().availableGeometry().center()
+        qr.moveCenter(cp)
+        self.move(qr.topLeft())
 
-        # Define the style for buttons
+    def create_shadow_effect(self, blur_radius=10, color=QColor(0, 0, 0, 160), offset=(2, 2)):
+        """
+        Create a drop shadow effect with the specified parameters.
+        """
+        shadow = QGraphicsDropShadowEffect()
+        shadow.setBlurRadius(blur_radius)
+        shadow.setColor(color)
+        shadow.setOffset(*offset)
+        return shadow
+
+    def create_styled_button(self, text, click_handler, icon_name=None):
+        """
+        Create a QPushButton with the specified text and click handler, applying a common style and shadow effect.
+        """
         button_style = """
             QPushButton {
-                background-color: #4CAF50;
+                background-color: #1E88E5;
                 border: none;
                 color: white;
                 padding: 10px 20px;
@@ -96,25 +102,43 @@ class DatabaseApp(QWidget):
             QPushButton:hover {
                 background-color: white;
                 color: black;
-                border: 2px solid #4CAF50;
+                border: 2px solid #1E88E5;
             }
         """
+        button = QPushButton(text)
+        button.clicked.connect(click_handler)
+        button.setStyleSheet(button_style)
+        button.setGraphicsEffect(self.create_shadow_effect(blur_radius=15, offset=(3, 3)))
+        if icon_name:
+            button.setIcon(qta.icon(icon_name, color='white'))
+        return button
+
+    def create_page1(self):
+        """
+        Create the first page for database connection.
+        """
+        # Create input fields for database connection details
+        self.dialect_edit = self.create_input_field('Enter SQL Dialect (e.g., mysql)')
+        self.driver_edit = self.create_input_field('Enter SQL Driver (e.g., pymysql)')
+        self.username_edit = self.create_input_field('Enter Username')
+        self.password_edit = self.create_input_field('Enter Password', password=True)
+        self.host_edit = self.create_input_field('Enter Host Address (e.g., localhost)')
+        self.port_edit = self.create_input_field('Enter Port Number (e.g., 3306)')
+        self.database_edit = self.create_input_field('Enter Database Name')
+        self.table_edit = self.create_input_field('Enter Table Name (optional)')
 
         # Create the "Connect to Database" button
-        self.connect_button = QPushButton('Connect to Database')
-        self.connect_button.clicked.connect(self.connect_to_database)
-        self.connect_button.setStyleSheet(button_style)
-        self.add_shadow_effect(self.connect_button)  # Add shadow effect to the button
+        self.connect_button = self.create_styled_button('Connect to Database', self.connect_to_database, 'fa5s.database')
 
         # Create the title label for the app
-        app_title_label = QLabel('Database Connection 📊')
+        app_title_label = QLabel('SQL Manager 📊')
         app_title_label.setFont(QFont('Arial', 24, QFont.Bold))
-        app_title_label.setStyleSheet("color: #00695c;")
+        app_title_label.setStyleSheet("color: #1E88E5;")
         app_title_label.setAlignment(Qt.AlignCenter)
 
         # Create section labels
         section_font = QFont('Verdana', 16, QFont.Bold)
-        section_style = "color: #004d40;"
+        section_style = "color: #1565C0;"
 
         db_connection_label = QLabel('Database Connection 🛠️')
         db_connection_label.setFont(section_font)
@@ -123,7 +147,7 @@ class DatabaseApp(QWidget):
         # Create a status label
         self.status_label = QLabel('Status: Ready')
         self.status_label.setFont(QFont('Arial', 16, QFont.Bold))
-        self.status_label.setStyleSheet("color: #004d40;")
+        self.status_label.setStyleSheet("color: #1565C0;")
         self.status_label.setAlignment(Qt.AlignCenter)
 
         # Set up the layout for the first page
@@ -161,66 +185,17 @@ class DatabaseApp(QWidget):
         """
         Create the second page for other database interactions.
         """
-        # Define the style for buttons
-        button_style = """
-            QPushButton {
-                background-color: #4CAF50;
-                border: none;
-                color: white;
-                padding: 10px 20px;
-                text-align: center;
-                text-decoration: none;
-                display: inline-block;
-                font-size: 16px;
-                margin: 4px 2px;
-                transition-duration: 0.4s;
-                cursor: pointer;
-                border-radius: 12px;
-                font-family: Verdana;
-                min-width: 10px;
-                min-height: 20px;
-            }
-            QPushButton:hover {
-                background-color: white;
-                color: black;
-                border: 2px solid #4CAF50;
-            }
-        """
-
         # Create buttons for various database operations
-        self.import_button = QPushButton('Import Excel File')
-        self.import_button.clicked.connect(self.import_excel)
-        self.import_button.setStyleSheet(button_style)
-        self.add_shadow_effect(self.import_button)
-
-        self.lowercase_button = QPushButton('Lowercase Headers')
-        self.lowercase_button.clicked.connect(self.lowercase_headers)
-        self.lowercase_button.setStyleSheet(button_style)
-        self.add_shadow_effect(self.lowercase_button)
-
-        self.replace_spaces_button = QPushButton('Replace Spaces in Headers')
-        self.replace_spaces_button.clicked.connect(self.replace_spaces_in_headers)
-        self.replace_spaces_button.setStyleSheet(button_style)
-        self.add_shadow_effect(self.replace_spaces_button)
-
-        self.drop_na_button = QPushButton('Drop NA')
-        self.drop_na_button.clicked.connect(self.drop_na_values)
-        self.drop_na_button.setStyleSheet(button_style)
-        self.add_shadow_effect(self.drop_na_button)
-
-        self.remove_duplicates_button = QPushButton('Remove Duplicates')
-        self.remove_duplicates_button.clicked.connect(self.remove_duplicates)
-        self.remove_duplicates_button.setStyleSheet(button_style)
-        self.add_shadow_effect(self.remove_duplicates_button)
-
-        self.disconnect_button = QPushButton('Disconnect from Database')
-        self.disconnect_button.clicked.connect(self.disconnect_from_database)
-        self.disconnect_button.setStyleSheet(button_style)
-        self.add_shadow_effect(self.disconnect_button)
+        self.import_button = self.create_styled_button('Import Excel File', self.import_excel, 'fa5s.file-excel')
+        self.lowercase_button = self.create_styled_button('Lowercase Headers', self.lowercase_headers, 'fa5s.text-height')
+        self.replace_spaces_button = self.create_styled_button('Replace Spaces in Headers', self.replace_spaces_in_headers, 'fa5s.text-width')
+        self.drop_na_button = self.create_styled_button('Drop NA', self.drop_na_values, 'fa5s.times-circle')
+        self.remove_duplicates_button = self.create_styled_button('Remove Duplicates', self.remove_duplicates, 'fa5s.clone')
+        self.disconnect_button = self.create_styled_button('Disconnect from Database', self.disconnect_from_database, 'fa5s.sign-out-alt')
 
         # Create section labels
         section_font = QFont('Verdana', 16, QFont.Bold)
-        section_style = "color: #004d40;"
+        section_style = "color: #1565C0;"
 
         import_data_label = QLabel('Import Data 📥')
         import_data_label.setFont(section_font)
@@ -237,7 +212,7 @@ class DatabaseApp(QWidget):
         # Create a status label
         self.status_label = QLabel('Status: Ready')
         self.status_label.setFont(QFont('Arial', 16, QFont.Bold))
-        self.status_label.setStyleSheet("color: #004d40;")
+        self.status_label.setStyleSheet("color: #1565C0;")
         self.status_label.setAlignment(Qt.AlignCenter)
 
         # Set up the layout for the second page
@@ -263,7 +238,6 @@ class DatabaseApp(QWidget):
         form_layout.addWidget(self.remove_duplicates_button)
 
         form_layout.addWidget(self.disconnect_button)
-
         form_layout.addWidget(self.status_label)
 
         center_layout = QHBoxLayout()
@@ -289,36 +263,22 @@ class DatabaseApp(QWidget):
         # Set the style sheet for the input field
         input_field.setStyleSheet("""
             QLineEdit {
-                border: 1px solid #4CAF50;
+                border: 1px solid #1E88E5;
                 border-radius: 10px;
                 padding: 10px;
                 font-family: Arial;
                 font-size: 14px;
             }
             QLineEdit:focus {
-                border: 2px solid #4CAF50;
+                border: 2px solid #1E88E5;
             }
         """)
 
         # Create and set a drop shadow effect for the input field
-        shadow = QGraphicsDropShadowEffect()
-        shadow.setBlurRadius(10)
-        shadow.setColor(QColor(0, 0, 0, 160))
-        shadow.setOffset(2, 2)
+        shadow = self.create_shadow_effect()
         input_field.setGraphicsEffect(shadow)
 
         return input_field  # Return the created input field
-
-    def add_shadow_effect(self, button):
-        """
-        Add a shadow effect to a given button.
-        """
-        # Create and set a drop shadow effect for the button
-        shadow = QGraphicsDropShadowEffect()
-        shadow.setBlurRadius(15)
-        shadow.setColor(QColor(0, 0, 0, 160))
-        shadow.setOffset(3, 3)
-        button.setGraphicsEffect(shadow)
 
     def connect_to_database(self):
         """
@@ -480,8 +440,8 @@ class DatabaseApp(QWidget):
         msg_box.setIcon(icon)
         msg_box.exec_()
 
+
 if __name__ == '__main__':
-    print("Starting the application...")
     app = QApplication(sys.argv)
     window = DatabaseApp()
     window.show()  # Explicitly show the window
