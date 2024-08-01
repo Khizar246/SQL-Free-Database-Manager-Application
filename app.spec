@@ -1,15 +1,16 @@
-
 # -*- mode: python ; coding: utf-8 -*-
 
 block_cipher = None
 
 a = Analysis(
-    ['main.py'],
-    pathex=['.'],
+    ['full_app_code.py'],  # Replace with your main script file name
+    pathex=['.'],  # Path to search for imports
     binaries=[],
-    datas=[],
+    datas=[
+        ('path_to_qtawesome_fonts', 'qtawesome/fonts'),  # Add any additional data files or directories needed
+    ],
     hiddenimports=[
-        'sqlalchemy', 'pandas', 'PyQt5', 'pymysql'
+        'pymysql', 'qtawesome'  # Add hidden imports if needed
     ],
     hookspath=[],
     runtime_hooks=[],
@@ -17,13 +18,9 @@ a = Analysis(
     win_no_prefer_redirects=False,
     win_private_assemblies=False,
     cipher=block_cipher,
-    noarchive=False,
 )
-
-pyz = PYZ(
-    a.pure, 
-    a.zipped_data, 
-    cipher=block_cipher
+pyz = PYZ(a.pure, a.zipped_data,
+    cipher=block_cipher,
 )
 
 exe = EXE(
@@ -31,14 +28,14 @@ exe = EXE(
     a.scripts,
     [],
     exclude_binaries=True,
-    name='database_app',
+    name='DatabaseApp',  # Name of your executable
     debug=False,
     bootloader_ignore_signals=False,
     strip=False,
     upx=True,
     upx_exclude=[],
     runtime_tmpdir=None,
-    console=True,
+    console=False  # Change to True if you want a console window to be shown
 )
 
 coll = COLLECT(
@@ -49,5 +46,5 @@ coll = COLLECT(
     strip=False,
     upx=True,
     upx_exclude=[],
-    name='database_app',
+    name='DatabaseApp'  # Name of the final folder containing all files
 )
